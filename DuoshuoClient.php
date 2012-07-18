@@ -6,7 +6,7 @@
  *
  */
 class DuoshuoClient{
-	var $end_point = 'http://duoshuo.com/api/';
+	var $end_point = 'http://api.duoshuo.com/';
 	/**
 	 * 返回值格式
 	 * @var string

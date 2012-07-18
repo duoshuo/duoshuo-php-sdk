@@ -26,10 +26,10 @@ class DuoshuoLocalServer{
 	protected $response = array();
 	
 	/**
-	 * 
+	 * 将评论等记录同步回本地数据库
 	 * @param array $input
 	 */
-	public function sync_posts($input = array()){
+	public function sync_logs($input = array()){
 		$this->response['response'] = Duoshuo::syncCommentsToLocal();
 		$this->response['code'] = 0;
 	}
