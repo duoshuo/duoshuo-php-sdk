@@ -2,8 +2,8 @@
 /**
  * 多说插件 api处理
  *
- * @version		$Id: api.php 0 10:17 2012-7-23
- * @author 		shen2
+ * @version		$Id: api.php 0 10:17 2013-4-11
+ * @author 		xiaowu
  * @copyright	Copyright (c) 2012 - , Duoshuo, Inc.
  * @link		http://dev.duoshuo.com
  */
@@ -18,12 +18,14 @@ function nocache_headers(){
 
 if (!headers_sent()) {
 	nocache_headers();//max age TODO:
-	header('Content-Type: text/javascript; charset=utf-8');
+	header('Content-Type: text/javascript; charset=gb2312');
 }
 
 require_once 'Client.php';
 require_once 'Abstract.php';
+require_once 'SDK.php';
 require_once 'LocalServer.php';
+require_once 'Exception.php';
 
 if (!class_exists('Duoshuo_Dedecms')){
 	$response = array(
@@ -34,7 +36,7 @@ if (!class_exists('Duoshuo_Dedecms')){
 	exit;
 }
 
-$plugin = Duoshuo_Dedecms::getInstance();
+$plugin = Duoshuo_SDK::getInstance();
 
 try{
 	if ($_SERVER['REQUEST_METHOD'] == 'POST'){
@@ -52,3 +54,4 @@ catch (Exception $e){
 	Duoshuo_LocalServer::sendException($e);
 	exit;
 }
+

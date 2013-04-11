@@ -32,77 +32,72 @@ class Duoshuo_LocalServer{
 			return;
 		}
 		
-		$limit = 50;
+		$this->plugin->updateOption('sync_lock',  time());
 		
-		try{
-			$this->plugin->updateOption('sync_lock',  time());
+		$last_sync = $this->plugin->getOption('last_sync');
+		
+		$limit = 20;
+		
+		$params = array(
+			'since_id' => $last_sync,
+			'limit' => $limit,
+			'order' => 'asc',
+		);
+		
+		$client = $this->plugin->getClient();
+		
+		$posts = array();
+		$affectedThreads = array();
+		$last_log_id = 0;
+		
+		do{
+			$response = $client->getLogList($params);
+		
+			$count = count($response['response']);
 			
-			$last_sync = $this->plugin->getOption('last_sync');
-			
-			$params = array(
-				'since' => $last_sync,
-				'limit' => $limit,
-				'order' => 'asc',
-			);
-			
-			$client = $this->plugin->getClient();
-			
-			$posts = array();
-			$affectedThreads = array();
-			$max_sync_date = 0;
-			
-			do{
-				$response = $client->getLogList($params);
-			
-				$count = count($response['response']);
-				
-				foreach($response['response'] as $log){
-					switch($log['action']){
-						case 'create':
-							$affected = $this->plugin->createPost($log['meta']);
-							break;
-						case 'approve':
-						case 'spam':
-						case 'delete':
-							$affected = $this->plugin->moderatePost($log['action'], $log['meta']);
-							break;
-						case 'delete-forever':
-							$affected = $this->plugin->deleteForeverPost($log['meta']);
-							break;
-						case 'update'://现在并没有update操作的逻辑
-						default:
-							$affected = array();
-					}
-					//合并
-					
-					$affectedThreads = array_merge($affectedThreads, $affected);
-				
-					if ($log['date'] > $max_sync_date)
-						$max_sync_date = $log['date'];
+			foreach($response['response'] as $log){
+				switch($log['action']){
+					case 'create':
+						$affected = $this->plugin->createPost($log['meta']);
+						break;
+					case 'approve':
+					case 'spam':
+					case 'delete':
+						$affected = $this->plugin->moderatePost($log['action'], $log['meta']);
+						break;
+					case 'delete-forever':
+						$affected = $this->plugin->deleteForeverPost($log['meta']);
+						break;
+					case 'update'://现在并没有update操作的逻辑
+					default:
+						$affected = array();
 				}
+				//合并
 				
-				$params['since'] = $max_sync_date;
-					
-			} while ($count == $limit);//如果返回和最大请求条数一致，则再取一次
+				$affectedThreads = array_merge($affectedThreads, $affected);
 			
-			//唯一化
-			$aidList = array_unique($affectedThreads);
-					
-			if ($max_sync_date > $last_sync)
-				$this->plugin->updateOption('last_sync', $max_sync_date);
+				if (strlen($log['log_id']) > strlen($last_log_id) || strcmp($log['log_id'], $last_log_id) > 0)
+					$last_log_id = $log['log_id'];
+			}
 			
-			$this->plugin->updateOption('sync_lock',  0);
-			
-			//更新静态文件
-			if ($this->plugin->getOption('sync_to_local') && $this->plugin->getOption('seo_enabled'))
-				$this->plugin->refreshThreads($aidList);
-			
-			$this->plugin->updateOption('sync_lock', 1);
-		}
-		catch(Exception $ex){
-			$this->plugin->updateOption('sync_lock', $ex->getLine());
-			//Showmsg($e->getMessage());
-		}
+			$params['since_id'] = $last_log_id;
+				
+		} while ($count == $limit);//如果返回和最大请求条数一致，则再取一次
+		
+		//唯一化
+		$aidList = array_unique($affectedThreads);
+				
+		if (strlen($last_log_id) > strlen($last_sync) || strcmp($last_log_id, $last_sync) > 0)
+			$this->plugin->updateOption('last_sync', $last_log_id);
+		
+		$this->plugin->updateOption('sync_lock',  0);
+		
+		//更新静态文件
+		if ($this->plugin->getOption('seo_enabled'))
+			$this->plugin->refreshThreads($aidList);
+		
+		$this->plugin->updateOption('sync_lock', 1);
+		
 		
 		//$this->response['response']
 		$this->response['code'] = Duoshuo_Exception::SUCCESS;

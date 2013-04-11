@@ -2,10 +2,23 @@
 /**
  * DuoshuoSDK Client类定义
  *
- * @version		$Id: Client.php 0 10:17 2012-7-23
- * @author 		shen2
+ * @version		$Id: Client.php 0 16:35 2013-4-11
+ * @author 		xiaowu
  * @copyright	Copyright (c) 2012 - , Duoshuo, Inc.
  * @link		http://dev.duoshuo.com
+ */
+require 'EasyHttp.php';
+require 'EasyHttp/Curl.php';
+require 'EasyHttp/Cookie.php';
+require 'EasyHttp/Encoding.php';
+require 'EasyHttp/Fsockopen.php';
+require 'EasyHttp/Proxy.php';
+require 'EasyHttp/Streams.php';
+/**
+ * 
+ * @link http://duoshuo.com/
+ * @author shen2
+ *
  */
 class Duoshuo_Client{
 	var $end_point = 'http://api.duoshuo.com/';
@@ -15,10 +28,10 @@ class Duoshuo_Client{
 	 */
 	var $format = 'json';
 	
-	var $userAgent = 'DuoshuoPhpSdk/0.2.0';
+	var $userAgent = 'DuoshuoPhpSdk/0.3.0';
 	
 	var $connecttimeout = 30;
-	var $timeout = 30;
+	var $timeout = 60;
 	var $shortName;
 	var $secret;
 	var $accessToken;
@@ -57,26 +70,52 @@ class Duoshuo_Client{
 	}
 	
 	function httpRequest($url, $method, $params){
-		$body = NULL;
+		$args = array(
+				'method' => $method,    //  GET/POST
+				'timeout' => $this->timeout,  //  超时的秒数
+				'redirection' => 5,     //  最大重定向次数
+				'httpversion' => '1.0', //  1.0/1.1
+				'user-agent' => $this->userAgent,
+				//'blocking' => true,     //  是否阻塞
+				'headers' 	=> array('Expect'=>''),   //  header信息
+				//'cookies' => array(),   //  关联数组形式的cookie信息
+				//'compress' => false,    //  是否压缩
+				//'decompress' => true,   //  是否自动解压缩结果
+				'sslverify' => true,
+				//'stream' => false,
+				//'filename' => null      //  如果stream = true，则必须设定一个临时文件名
+		);
 		switch($method){
 			case 'GET':
 				$url .= '?' . http_build_query($params, null, '&');	// overwrite arg_separator.output
 				break;
 			case 'POST':
 				$headers = array();
-				$body = http_build_query($params);	//未支持multi
+				$args['body'] =  http_build_query($params);
 				break;
 			default:
 		}
-		$response = $this->http($url,$body, $method);
-			
-		if (isset($response->curlErr)){
-			throw new Duoshuo_Exception('Curl错误：'.$response->curlErr, Duoshuo_Exception::CANNOT_ACCESS);
+		$http = new EasyHttp();
+		$response = $http->request($url, $args);
+		if (isset($response->errors)){
+			if (isset($response->errors['http_request_failed'])){
+				$message = $response->errors['http_request_failed'][0];
+				if ($message == 'name lookup timed out')
+					$message = 'DNS解析超时，请重试或检查你的主机的域名解析(DNS)设置。';
+				elseif (stripos($message, 'Could not open handle for fopen') === 0)
+					$message = '无法打开fopen句柄，请重试或联系多说管理员。http://dev.duoshuo.com/';
+				elseif (stripos($message, 'Couldn\'t resolve host') === 0)
+					$message = '无法解析duoshuo.com域名，请重试或检查你的主机的域名解析(DNS)设置。';
+				elseif (stripos($message, 'Operation timed out after ') === 0)
+					$message = '操作超时，请重试或联系多说管理员。http://dev.duoshuo.com/';
+				throw new Duoshuo_Exception($message, Duoshuo_Exception::REQUEST_TIMED_OUT);
+			}
+            else
+            	throw new Duoshuo_Exception('连接服务器失败, 详细信息：' . json_encode($response->errors), Duoshuo_Exception::REQUEST_TIMED_OUT);
 		}
 
-		$json = json_decode($response, true);
-		
-		return $json === null ? $response : $json;
+		$json = json_decode($response['body'], true);
+		return $json === null ? $response['body'] : $json;
 	}
 	
 	/**
@@ -122,45 +161,6 @@ class Duoshuo_Client{
 		}
 		
 		return $token;
-	}
-	
-	function http($url, $postfields, $method = 'POST'){
-		$ci = curl_init();
-		/* Curl settings */
-		curl_setopt($ci, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
-		curl_setopt($ci, CURLOPT_USERAGENT,$this->userAgent);
-		curl_setopt($ci, CURLOPT_CONNECTTIMEOUT, $this->connecttimeout);
-		curl_setopt($ci, CURLOPT_TIMEOUT, $this->timeout);
-		curl_setopt($ci, CURLOPT_RETURNTRANSFER, TRUE);
-		curl_setopt($ci, CURLOPT_ENCODING, "");
-		curl_setopt($ci, CURLOPT_SSL_VERIFYPEER, FALSE);
-		curl_setopt($ci, CURLOPT_HEADER, FALSE);
-	
-		switch ($method) {
-			case 'POST':
-				curl_setopt($ci, CURLOPT_POST, TRUE);
-				if (!empty($postfields)) {
-					curl_setopt($ci, CURLOPT_POSTFIELDS, $postfields);
-					$this->postdata = $postfields;
-				}
-				break;
-			case 'DELETE':
-				curl_setopt($ci, CURLOPT_CUSTOMREQUEST, 'DELETE');
-				if (!empty($postfields)) {
-					$url = "{$url}?{$postfields}";
-				}
-		}
-		curl_setopt($ci, CURLOPT_URL, $url );
-	
-		curl_setopt($ci, CURLINFO_HEADER_OUT, FALSE );
-	
-		$response = curl_exec($ci);
-		
-		if($response === false){
-			$response->curlErr = curl_error($ci);
-		}
-		
-		return $response;
 	}
 	
 	/**
