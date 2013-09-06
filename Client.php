@@ -178,7 +178,7 @@ class Duoshuo_Client{
 	// http://www.ietf.org/rfc/rfc2104.txt
 	static function hmacsha1($data, $key) {
 		if (function_exists('hash_hmac'))
-			return hash_hmac('sha1', $data, $key);
+			return hash_hmac('sha1', $data, $key,true);
 		
 	    $blocksize=64;
 	    $hashfunc='sha1';
