@@ -27,7 +27,7 @@ require_once 'SDK.php';
 require_once 'LocalServer.php';
 require_once 'Exception.php';
 
-if (!class_exists('Duoshuo_Dedecms')){
+if (!class_exists('Duoshuo_SDK')){
 	$response = array(
 		'code'			=>	30,
 		'errorMessage'	=>	'Duoshuo plugin hasn\'t been activated.'
